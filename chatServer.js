@@ -9,7 +9,7 @@ var mysql_con = mysql.createConnection({
 	host : 'localhost',
 	port : 3306,
 	user : 'root',
-	password : 'mate',
+	password : '8386',
 	database : 'travel'
 });
 
@@ -129,7 +129,7 @@ io.on('connection',function(socket){
 	  		socket.join(data.userCode);
 			console.log('userCode: ' + data.userCode);
 
-	  		var sql = "select roomCode from messageroom where senderCode=" + data.userCode + " or receiverCode=" + data.userCode;
+	  		var sql = "select roomCode from messageRoom where senderCode=" + data.userCode + " or receiverCode=" + data.userCode;
 	  		mysql_con.query(sql, function(err,rows){
 	  			for(idx in rows){
                 	socket.join(rows[idx].roomCode);
