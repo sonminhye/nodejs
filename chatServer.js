@@ -9,7 +9,7 @@ var mysql_con = mysql.createConnection({
 	host : 'localhost',
 	port : 3306,
 	user : 'root',
-	password : 'mate',
+	password : '8386',
 	database : 'travel'
 });
 
@@ -94,14 +94,11 @@ io.on('connection',function(socket){
 
 		socket.nickname = urlencode.decode(socket.nickname);
 		console.log(socket.room + "번 방에 " + socket.nickname + " 유저 입장");
-
+console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
 	});
 
 	 // 메시지 전달
 	  socket.on('msg', function(data){
-
-		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
-		var readFlag = data.readFlag;
 
 		//같은 방에 있는 상대방이 읽고 있다면,
 		//readFlag 를 1로 하고, 아니라면 0 으로
@@ -111,7 +108,7 @@ io.on('connection',function(socket){
 		      msg : data.msg,
 		      roomCode : socket.room,
 		      date : data.date,
-		      readFlag : readFlag
+		      readFlag : data.readFlag
 		    });	
 
 			var sql = "insert into message set ?";
