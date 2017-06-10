@@ -9,7 +9,7 @@ var mysql_con = mysql.createConnection({
 	host : 'localhost',
 	port : 3306,
 	user : 'root',
-	password : '8386',
+	password : '1234',
 	database : 'travel'
 });
 
@@ -44,8 +44,6 @@ io.on('connection',function(socket){
 
 
 	var nickname;
-	var nick_k;
-	var room;
 	var rcode;
 	var scode;
 
@@ -62,11 +60,12 @@ io.on('connection',function(socket){
 		socket.inChat = true;
 		
 		socket.join(socket.room);
-		socket.join(scode);
+		console.log('scode :' + scode);
+		socket.join('u'+scode);
 		
 		var participate = false;
 
-		if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber(scode)){ //현재 나 말고 누군가 있다
+		if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고 누군가 있다
 			//해당 룸의 모든 socket 정보들을 가져오고
 			var sockets = io.sockets.adapter.rooms[socket.room]['sockets'];
 			//for 문으로 소켓 하나씩 검사
@@ -81,6 +80,8 @@ io.on('connection',function(socket){
 			}
 		}
 
+		console.log('참여여부 : ' + participate);
+
 		socket.broadcast.to(socket.room).emit('join', {
 			nickname : socket.nickname,
 			participate : participate
@@ -94,12 +95,12 @@ io.on('connection',function(socket){
 
 		socket.nickname = urlencode.decode(socket.nickname);
 		console.log(socket.room + "번 방에 " + socket.nickname + " 유저 입장");
-console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
+		
 	});
 
 	 // 메시지 전달
 	  socket.on('msg', function(data){
-
+		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
 		//같은 방에 있는 상대방이 읽고 있다면,
 		//readFlag 를 1로 하고, 아니라면 0 으로
 		    io.sockets.in(socket.room).emit('msg', {
@@ -112,7 +113,7 @@ console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.m
 		    });	
 
 			var sql = "insert into message set ?";
-		    var value = {roomCode:socket.room, senderCode:scode, receiverCode:rcode,content:data.msg, sendDate:data.date, readFlag:readFlag};
+		    var value = {roomCode:socket.room, senderCode:scode, receiverCode:rcode,content:data.msg, sendDate:data.date, readFlag:data.readFlag};
 				mysql_con.query(sql, value, function (err, result)  {
 				if (err) throw err;
 			});
@@ -142,11 +143,11 @@ console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.m
 			if(socket.room!=undefined && scode!=undefined){
 				
 				var participate = false;
-				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber(scode)){ //현재 나 말고도 누군가 있는 상태
-					if(getUsersInRoomNumber(scode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태라면 지금 나가도 나가는게 아님.
+				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고도 누군가 있는 상태
+					if(getUsersInRoomNumber('u'+scode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태라면 지금 나가도 나가는게 아님.
 						console.log('same user exist');
 						participate = true;
-					}else if(getUsersInRoomNumber(scode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
+					}else if(getUsersInRoomNumber('u'+scode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
 						console.log('same user not exist');
 						participate = false;
 					}
