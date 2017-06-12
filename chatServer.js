@@ -31,6 +31,7 @@ http.listen(3000, function(){
 io.on('connection',function(socket){
 
 	var getUsersInRoomNumber = function(roomName) {
+		console.log('roomName : ' + roomName);
 	    var room = io.sockets.adapter.rooms[roomName];
 	    if (!room) return null;
 	    var num = 0;
@@ -50,7 +51,7 @@ io.on('connection',function(socket){
 	socket.inChat = false;
 
 	//채팅방 들어간 것
-	socket.on('join', function(data){
+	socket.on('chat', function(data){
 
 		socket.nickname = data.nickname;
 		socket.room = data.room;
@@ -59,13 +60,13 @@ io.on('connection',function(socket){
 		socket.mCode = scode;
 		socket.inChat = true;
 		
-		socket.join(socket.room);
-		console.log('scode :' + scode);
-		socket.join('u'+scode);
+		//socket.join(socket.room);
+		//socket.join('u'+scode);
 		
 		var participate = false;
 
 		if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고 누군가 있다
+			
 			//해당 룸의 모든 socket 정보들을 가져오고
 			var sockets = io.sockets.adapter.rooms[socket.room]['sockets'];
 			//for 문으로 소켓 하나씩 검사
@@ -124,8 +125,8 @@ io.on('connection',function(socket){
 	  //모든 룸의 메세지(안읽은) 개수를 카운트 해주기 위한 메소드
 	  socket.on('joinAllRooms',function(data){
 
-	  		socket.join(data.userCode);
-			console.log('userCode: ' + data.userCode);
+	  		socket.join('u'+data.userCode);
+			
 
 	  		var sql = "select roomCode from messageRoom where senderCode=" + data.userCode + " or receiverCode=" + data.userCode;
 	  		mysql_con.query(sql, function(err,rows){
@@ -144,6 +145,7 @@ io.on('connection',function(socket){
 				
 				var participate = false;
 				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고도 누군가 있는 상태
+					console.log("hello");
 					if(getUsersInRoomNumber('u'+scode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태라면 지금 나가도 나가는게 아님.
 						console.log('same user exist');
 						participate = true;
