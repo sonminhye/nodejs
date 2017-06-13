@@ -2,31 +2,45 @@ var app=require("express")();
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var urlencode = require('urlencode');
-var _ = require('underscore');
+
+var schedule = require('node-schedule');
+var cron = '00 00 01 * * *';
+
+
+
 
 var mysql = require('mysql');
 var mysql_con = mysql.createConnection({
 	host : 'localhost',
 	port : 3306,
 	user : 'root',
-	password : 'mate',
+	password : '8386',
 	database : 'travel'
 });
+
+
+
 
  //나중에 함수로 다 묶을 것 
 mysql_con.connect(function(err){
 	if(err){
 		console.log("mysql connection error");
 		console.err(err);
-		throw err; //에러를 throw 한다는 것이 어떤 의미인지! 잘 알아둘 것
+		throw err;
 	}
 });
-
 
 http.listen(3000, function(){
 	console.log("listening at http://127.0.0.1:3000...");
 });
 
+
+var j = schedule.scheduleJob(cron, function(){
+	var sql = "delete from message where sendDate <= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+	mysql_con.query(sql, function(err,rows){
+	  	console.log(rows.affectedRows + "건 삭제되었습니다.");
+	});
+});
 
 io.on('connection',function(socket){
 
@@ -43,26 +57,21 @@ io.on('connection',function(socket){
 	    return num;
 	};
 
-
 	var nickname;
 	var rcode;
 	var scode;
-
 	socket.inChat = false;
 
 	//채팅방 들어간 것
 	socket.on('chat', function(data){
-
-		socket.nickname = data.nickname;
-		socket.room = data.room;
+		
 		scode = data.scode;
 		rcode = data.rcode;
-		socket.mCode = scode;
+		socket.nickname = data.nickname;
+		socket.room = data.room;
+		socket.mCode = data.scode;
 		socket.inChat = true;
-		
-		//socket.join(socket.room);
-		//socket.join('u'+scode);
-		
+
 		var participate = false;
 
 		if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고 누군가 있다
@@ -81,8 +90,6 @@ io.on('connection',function(socket){
 			}
 		}
 
-		console.log('참여여부 : ' + participate);
-
 		socket.broadcast.to(socket.room).emit('join', {
 			nickname : socket.nickname,
 			participate : participate
@@ -95,7 +102,7 @@ io.on('connection',function(socket){
 		});
 
 		socket.nickname = urlencode.decode(socket.nickname);
-		console.log(socket.room + "번 방에 " + socket.nickname + " 유저 입장");
+		console.log(socket.room + " 룸에 " + socket.nickname + " 유저 입장");
 		
 	});
 
@@ -126,9 +133,9 @@ io.on('connection',function(socket){
 	  socket.on('joinAllRooms',function(data){
 
 	  		socket.join('u'+data.userCode);
-			
 
-	  		var sql = "select roomCode from messageRoom where senderCode=" + data.userCode + " or receiverCode=" + data.userCode;
+	  		var sql = "select messageRoom.roomCode from messageRoom join roomUser where roomUser.userCode=" + data.userCode + " group by messageRoom.roomCode";
+
 	  		mysql_con.query(sql, function(err,rows){
 	  			for(idx in rows){
                 	socket.join(rows[idx].roomCode);
@@ -160,9 +167,7 @@ io.on('connection',function(socket){
 			  		nickname : socket.nickname,
 			  		participate : participate
 		  		});
-			}
-
-		  	
+			}		  	
 	  });
 });
 
