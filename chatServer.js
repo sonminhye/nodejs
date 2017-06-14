@@ -7,8 +7,6 @@ var schedule = require('node-schedule');
 var cron = '00 00 01 * * *';
 
 
-
-
 var mysql = require('mysql');
 var mysql_con = mysql.createConnection({
 	host : 'localhost',
@@ -17,8 +15,6 @@ var mysql_con = mysql.createConnection({
 	password : '8386',
 	database : 'travel'
 });
-
-
 
 
  //나중에 함수로 다 묶을 것 
@@ -90,6 +86,7 @@ io.on('connection',function(socket){
 			}
 		}
 
+		
 		socket.broadcast.to(socket.room).emit('join', {
 			nickname : socket.nickname,
 			participate : participate
@@ -146,16 +143,26 @@ io.on('connection',function(socket){
 
 	  socket.on('disconnect',function(){
 
+	  		console.log('disconnect');
 			socket.inChat = false;
 			
 			if(socket.room!=undefined && scode!=undefined){
 				
 				var participate = false;
 				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고도 누군가 있는 상태
-					console.log("hello");
 					if(getUsersInRoomNumber('u'+scode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태라면 지금 나가도 나가는게 아님.
 						console.log('same user exist');
-						participate = true;
+						//또다른 나의 아이디의 inChat 여부 검사
+						var sockets = io.sockets.adapter.rooms['u'+scode]['sockets'];
+						//for 문으로 소켓 하나씩 검사
+						for (var socketId in sockets) {
+							var soc = io.sockets.connected[socketId];
+							//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
+							if(soc['inChat']){
+								//현재 타인이 채팅방에 있는지 여부를 저장
+								participate = soc['inChat'];
+							}
+						}
 					}else if(getUsersInRoomNumber('u'+scode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
 						console.log('same user not exist');
 						participate = false;
