@@ -6,7 +6,6 @@ var urlencode = require('urlencode');
 var schedule = require('node-schedule');
 var cron = '00 00 01 * * *';
 
-
 var mysql = require('mysql');
 var mysql_con = mysql.createConnection({
 	host : 'localhost',
@@ -29,7 +28,6 @@ mysql_con.connect(function(err){
 http.listen(3000, function(){
 	console.log("listening at http://127.0.0.1:3000...");
 });
-
 
 var j = schedule.scheduleJob(cron, function(){
 	var sql = "delete from message where sendDate <= DATE_SUB(NOW(), INTERVAL 30 DAY)"
@@ -108,21 +106,24 @@ io.on('connection',function(socket){
 		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
 		//같은 방에 있는 상대방이 읽고 있다면,
 		//readFlag 를 1로 하고, 아니라면 0 으로
-		    io.sockets.in(socket.room).emit('msg', {
-		      scode : scode,
-		      nickname : socket.nickname,
-		      msg : data.msg,
-		      roomCode : socket.room,
-		      date : data.date,
-		      readFlag : data.readFlag
-		    });	
-
+			var messageCode;
 			var sql = "insert into message set ?";
 		    var value = {roomCode:socket.room, senderCode:scode, receiverCode:rcode,content:data.msg, sendDate:data.date, readFlag:data.readFlag};
-				mysql_con.query(sql, value, function (err, result)  {
+			
+			mysql_con.query(sql, value, function (err, result)  {
 				if (err) throw err;
+				messageCode = result.insertId;
 			});
 
+		    io.sockets.in(socket.room).emit('msg', {
+		    	messageCode : messageCode,
+			    scode : scode,
+			    nickname : socket.nickname,
+			    msg : data.msg,
+			    roomCode : socket.room,
+			    date : data.date,
+			    readFlag : data.readFlag
+		    });	
 	  });
 
 	  //header 와 chatList 에서 쓰임.
@@ -130,8 +131,8 @@ io.on('connection',function(socket){
 	  socket.on('joinAllRooms',function(data){
 
 	  		socket.join('u'+data.userCode);
-
-	  		var sql = "select messageRoom.roomCode from messageRoom join roomUser where roomUser.userCode=" + data.userCode + " group by messageRoom.roomCode";
+	  		console.log("joinAllRooms");
+	  		var sql = "select roomCode from roomUser where userCode=" + data.userCode;
 
 	  		mysql_con.query(sql, function(err,rows){
 	  			for(idx in rows){
