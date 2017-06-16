@@ -5,26 +5,8 @@ var urlencode = require('urlencode');
 
 var schedule = require('node-schedule');
 var cron = '00 00 01 * * *';
-
-
 var mysql = require('./dbconnection.js');
-/*var mysql_con = mysql.createConnection({
-	host : 'localhost',
-	port : 3306,
-	user : 'root',
-	password : '8386',
-	database : 'travel'
-});*/
 
-
- //나중에 함수로 다 묶을 것 
-/*mysql_con.connect(function(err){
-	if(err){
-		console.log("mysql connection error");
-		console.err(err);
-		throw err;
-	}
-});*/
 
 http.listen(3000, function(){
 	console.log("listening at http://127.0.0.1:3000...");
