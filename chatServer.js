@@ -2,7 +2,7 @@ var app=require("express")();
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var urlencode = require('urlencode');
-
+var Chat = require('./mongoose.js');
 var schedule = require('node-schedule');
 var cron = '00 00 01 * * *';
 var mysql = require('./dbconnection.js');
@@ -22,9 +22,6 @@ var j = schedule.scheduleJob(cron, function(){
 
 
 io.on('connection',function(socket){
-	
-	var msgList = [];
-
 
 	var getUsersInRoomNumber = function(roomName) {
 	    var room = io.sockets.adapter.rooms[roomName];
@@ -41,13 +38,21 @@ io.on('connection',function(socket){
 	var emitmsg = function(data){
 			
 			var messageCode;
-			var sql = "insert into message set ?";
-			var value = {roomCode:socket.room, senderCode:scode, receiverCode:rcode,content:data.msg, sendDate:data.date, readFlag:data.readFlag};
+			
+			//mongodb
+			var chat = new Chat();
+			chat.roomCode = socket.room;
+			chat.senderCode = scode;
+			chat.senderName = socket.nickname;
+			chat.receiverCode = rcode;
+			chat.content = data.msg;
+			chat.sendDate = data.date;
+			chat.readFlag = data.readFlag;
 
-			mysql.insertbyValue(sql, value, function (err, result)  {
-				if (err) throw err;
-				messageCode = result;
-				console.log(messageCode);
+			chat.save(function(err){
+				if(err)
+					console.error(err);
+			});
 
 			 io.sockets.in(socket.room).emit('msg', {
 		    	messageCode : messageCode,
@@ -58,8 +63,6 @@ io.on('connection',function(socket){
 			    date : data.date,
 			    readFlag : data.readFlag
 	 	  	 });
-
-		});
 	};
 
 	var nickname;
@@ -70,8 +73,9 @@ io.on('connection',function(socket){
 
 	//채팅방 들어간 것
 	socket.on('chat', function(data){
+		
 		console.log('chat');
-		msgList = []; //메세지 리스트 초기화
+
 		scode = data.scode;
 		rcode = data.rcode;
 		socket.nickname = data.nickname;
@@ -116,11 +120,12 @@ io.on('connection',function(socket){
 	 // 메시지 전달
 	  socket.on('msg', function(data){
 		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
-		//같은 방에 있는 상대방이 읽고 있다면,
-		//readFlag 를 1로 하고, 아니라면 0 으로
+		
+
 			if(socket.room==0){
 				//방이 없고 새로운 방을 생성해야 하는 경우라면, 방을 생성하고 유저 등록.
 				var sql = "insert into messageRoom(latestdate) values('" + data.date + "')";
+
 				mysql.insertIdReturn(sql, function(result){
 				
 					socket.room = result;
@@ -128,7 +133,6 @@ io.on('connection',function(socket){
 					sql += "(" + socket.room + "," + scode + "),";
 					sql += "(" + socket.room + "," + rcode + ")";
 					mysql.insert(sql, function(err,result){});
-			
 					socket.leave(0);
 					socket.join(socket.room);
 
@@ -153,7 +157,7 @@ io.on('connection',function(socket){
 	  });
 
 	  //header 와 chatList 에서 쓰임.
-	  //모든 룸의 메세지(안읽은) 개수를 카운트 해주기 위한 메소드
+	  //모든 룸의 현재 오고있는 메세지를 알려주기 위한 메소드
 	  socket.on('joinAllRooms',function(data){
 
 			console.log("joinAllRooms");
@@ -194,7 +198,8 @@ io.on('connection',function(socket){
 					}else if(getUsersInRoomNumber('u'+scode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
 						participate = false;
 					}
-				}			
+				}	
+
 				socket.broadcast.to(socket.room).emit('left',{
 			  		nickname : socket.nickname,
 			  		participate : participate

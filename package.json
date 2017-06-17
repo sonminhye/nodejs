@@ -5,7 +5,9 @@
   "main": "chatServer.js",
   "dependencies": {
     "express": "^4.15.3",
+    "mongoose": "^4.10.6",
     "mysql": "^2.13.0",
+    "node-schedule": "^1.2.3",
     "socket.io": "^2.0.2",
     "underscore": "^1.8.3",
     "urlencode": "^1.1.0"
