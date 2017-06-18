@@ -13,12 +13,8 @@ http.listen(3000, function(){
 });
 
 var j = schedule.scheduleJob(cron, function(){
-	var sql = "delete from message where sendDate <= DATE_SUB(NOW(), INTERVAL 30 DAY)"
-	/*mysql_con.query(sql, function(err,rows){
-	  	console.log(rows.affectedRows + "건 삭제되었습니다.");
-	});*/
+	//mongodb 삭제기능
 });
-
 
 
 io.on('connection',function(socket){
@@ -83,6 +79,7 @@ io.on('connection',function(socket){
 		socket.inChat = true;
 
 		var participate = false;
+		//아직 대화를 나누지 않은 채팅방에 들어갔을 경우
 		if(socket.room==0)
 			socket.join(0);
 
@@ -119,22 +116,22 @@ io.on('connection',function(socket){
 
 	 // 메시지 전달
 	  socket.on('msg', function(data){
+
 		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
 		
 
 			if(socket.room==0){
 				//방이 없고 새로운 방을 생성해야 하는 경우라면, 방을 생성하고 유저 등록.
 				var sql = "insert into messageRoom(latestdate) values('" + data.date + "')";
-
 				mysql.insertIdReturn(sql, function(result){
-				
-					socket.room = result;
-					sql = "insert into roomUser values";
-					sql += "(" + socket.room + "," + scode + "),";
-					sql += "(" + socket.room + "," + rcode + ")";
-					mysql.insert(sql, function(err,result){});
-					socket.leave(0);
-					socket.join(socket.room);
+			
+				socket.room = result;
+				sql = "insert into roomUser values";
+				sql += "(" + socket.room + "," + scode + "),";
+				sql += "(" + socket.room + "," + rcode + ")";
+				mysql.insert(sql, function(err,result){});
+				socket.leave(0);
+				socket.join(socket.room);
 
 					var sockets = io.sockets.adapter.rooms['u'+rcode];
 					if(sockets!=undefined){
@@ -152,7 +149,9 @@ io.on('connection',function(socket){
 				});
 
 			}else{
+
 				emitmsg(data);
+
 			}
 	  });
 
