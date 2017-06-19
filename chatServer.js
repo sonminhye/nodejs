@@ -123,47 +123,65 @@ io.on('connection',function(socket){
 	  socket.on('msg', function(data){
 
 		console.log(socket.room + "의 " + socket.nickname + '가 보낸 msg: ' + data.msg);
-		
 
 			if(socket.room==0){
 				//방이 없고 새로운 방을 생성해야 하는 경우라면, 방을 생성하고 유저 등록.
-
 				var sql = "insert into messageRoom(latestdate) values('" + data.date + "')";
-
-				mysql.query(sql, function(err,result){
-					socket.room = result.insertId;
-					
-					sql = "insert into roomUser values";
-					sql += "(" + socket.room + "," + scode + "),";
-					sql += "(" + socket.room + "," + rcode + ")";
-
-					mysql.query(sql, function(err,result){
-
-					});
-								
-				socket.leave(0);
-				socket.join(socket.room);
-
-					var sockets = io.sockets.adapter.rooms['u'+rcode];
-					if(sockets!=undefined){
-						var socs = sockets['sockets'];
-						for (var socketId in socs) {
-						var soc = io.sockets.connected[socketId];
-							//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
-							soc.join(socket.room)
-							io.to(soc.id).emit('newRoom',{
-								roomCode : socket.room
-							});
-						}
+				
+				mysql.beginTransaction(function(err){
+					if(err) {
+						throw err;
 					}
-					emitmsg(data);
-				});
+					mysql.query(sql, function(err,result){	
+						if(err) {
+							mysql.rollback(function(){
+								throw err;
+							})
+						}
+						socket.room = result.insertId;
+					
+						sql = "insert into roomUser values";
+						sql += "(" + socket.room + "," + scode + "),";
+						sql += "(" + socket.room + "," + rcode + ")";
 
+						mysql.query(sql, function(err,result){
+							if(err) {
+								mysql.rollback(function(){
+									throw err;
+								});
+							}
+								mysql.commit(function(err){
+									if(err) {
+										mysql.rollback(function(){
+											throw err;
+										});
+									}
+									console.log('success!');
+								});
+						});
+								
+						socket.leave(0);
+						socket.join(socket.room);
+						var sockets = io.sockets.adapter.rooms['u'+rcode];
+						
+						//현재 해당 유저가 있다면 입장시키기
+						if(sockets!=undefined){
+							var socs = sockets['sockets'];
+							for (var socketId in socs) {
+							var soc = io.sockets.connected[socketId];
+								//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
+								soc.join(socket.room)
+								io.to(soc.id).emit('newRoom',{
+									roomCode : socket.room
+								});
+							}
+						}
+						emitmsg(data);
+					});
+
+				}); //transaction end
 			}else{
-
-
 				emitmsg(data);
-
 			}
 	  });
 
