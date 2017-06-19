@@ -3,18 +3,23 @@ var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var urlencode = require('urlencode');
 var Chat = require('./mongoose.js');
-var schedule = require('node-schedule');
-var cron = '00 00 01 * * *';
-var mysql = require('./dbconnection.js');
+var mysql_dbc = require('./dbconnection.js')();
+var mysql = mysql_dbc.init();
+mysql_dbc.connection_open(mysql);
 
 
 http.listen(3000, function(){
 	console.log("listening at http://127.0.0.1:3000...");
 });
 
-var j = schedule.scheduleJob(cron, function(){
-	//mongodb 삭제기능
-});
+// var schedule = require('node-schedule');
+// var cron = '00 00 01 * * *';
+// var j = schedule.scheduleJob(cron, function(){
+// 	var sql = "delete from message where sendDate <= DATE_SUB(NOW(), INTERVAL 30 DAY)" 
+// 	 mysql_con.query(sql, function(err,rows){
+// 	  	  	console.log(rows.affectedRows + "건 삭제되었습니다.");
+// 	 });
+// });
 
 
 io.on('connection',function(socket){
@@ -122,14 +127,20 @@ io.on('connection',function(socket){
 
 			if(socket.room==0){
 				//방이 없고 새로운 방을 생성해야 하는 경우라면, 방을 생성하고 유저 등록.
+
 				var sql = "insert into messageRoom(latestdate) values('" + data.date + "')";
-				mysql.insertIdReturn(sql, function(result){
-			
-				socket.room = result;
-				sql = "insert into roomUser values";
-				sql += "(" + socket.room + "," + scode + "),";
-				sql += "(" + socket.room + "," + rcode + ")";
-				mysql.insert(sql, function(err,result){});
+
+				mysql.query(sql, function(err,result){
+					socket.room = result.insertId;
+					
+					sql = "insert into roomUser values";
+					sql += "(" + socket.room + "," + scode + "),";
+					sql += "(" + socket.room + "," + rcode + ")";
+
+					mysql.query(sql, function(err,result){
+
+					});
+								
 				socket.leave(0);
 				socket.join(socket.room);
 
@@ -150,6 +161,7 @@ io.on('connection',function(socket){
 
 			}else{
 
+
 				emitmsg(data);
 
 			}
@@ -164,14 +176,13 @@ io.on('connection',function(socket){
 	  		socket.join('u'+data.userCode);
 	  		var sql = "select roomCode from roomUser where userCode=" + data.userCode;
 	  		
-	  		mysql.selectList(sql, function(err,rows){
-	  			for(idx in rows){
-            	socket.join(rows[idx].roomCode);
-            	console.log("roomName: " + rows[idx].roomCode + ' 입장');
-        		}
-	  		});	  	
+	  		mysql.query(sql, function(err, rows){
+				for(idx in rows){
+            		socket.join(rows[idx].roomCode);
+            		console.log("roomName: " + rows[idx].roomCode + ' 입장');
+            	}
+	  		});  	
 	  });
-
 
 	  socket.on('disconnect',function(){
 
