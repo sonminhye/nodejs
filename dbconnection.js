@@ -1,5 +1,5 @@
 var mysql = require('mysql');
-var config = require('./db_info').local;
+var config = require('./db_info').daou;
 module.exports = function(){
 	return {
 		init: function(){
@@ -22,26 +22,3 @@ module.exports = function(){
 	}
 };
 
-// exports.selectList = function(sql, callback){
-// 	mysql_con.query(sql, function (err, result)  {
-// 		callback(err,result);
-// 	});
-// };
-
-// exports.insert = function(sql){
-// 	mysql_con.query(sql, function (err, result)  {
-// 		if(err) throw err;
-// 	});
-// };
-
-// exports.insertIdReturn = function(sql, callback){
-// 	mysql_con.query(sql, function (err, result)  {
-// 		return callback(result.insertId);
-// 	});
-// };
-
-exports.insertbyValue = function(sql, value, callback){
-	mysql_con.query(sql, value, function (err, result)  {
-		return callback(err, result.insertId);
-	});
-};
