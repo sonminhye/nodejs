@@ -12,93 +12,98 @@ http.listen(3000, function(){
 	console.log("listening at http://127.0.0.1:3000...");
 });
 
-// var schedule = require('node-schedule');
-// var cron = '00 00 01 * * *';
-// var j = schedule.scheduleJob(cron, function(){
-// 	var sql = "delete from message where sendDate <= DATE_SUB(NOW(), INTERVAL 30 DAY)" 
-// 	 mysql_con.query(sql, function(err,rows){
-// 	  	  	console.log(rows.affectedRows + "건 삭제되었습니다.");
-// 	 });
-// });
-
 
 io.on('connection',function(socket){
 
 	var getUsersInRoomNumber = function(roomName) {
+	    //해당 룸의 모든 소켓들을 가져옴
+	    //Room { sockets : { socket 아이디 : true}, length : 1}
 	    var room = io.sockets.adapter.rooms[roomName];
-	    if (!room) return null;
-	    var num = 0;
-	    var clients = room['sockets'];
-	    for (var i in clients) {
-	    	console.log(i);
-	    	num++;
-	    }
+	    console.log(room);
+		    if (!room) return null;
+		    var num = 0;
+		    //그 룸의 소켓 아이디들만 추출
+		    var clients = room['sockets'];
+		    for (var i in clients) {
+		    	console.log(i);
+		    	num++;
+		    }
+	    //소켓의 개수 리턴해줌
 	    return num;
 	};
 
 	var emitmsg = function(data){
-			
-			var messageCode;
-			
+
+			var messageCode;	
 			//mongodb
 			var chat = new Chat();
 			chat.roomCode = socket.room;
-			chat.senderCode = scode;
+			chat.senderCode = socket.mCode;
 			chat.senderName = socket.nickname;
 			chat.receiverCode = rcode;
 			chat.content = data.msg;
 			chat.sendDate = data.date;
 			chat.readFlag = data.readFlag;
 
-			chat.save(function(err){
+			chat.save(function(err, result){
+
 				if(err)
 					console.error(err);
-			});
 
-			 io.sockets.in(socket.room).emit('msg', {
-		    	messageCode : messageCode,
-			    scode : scode,
-			    nickname : socket.nickname,
-			    msg : data.msg,
-			    roomCode : socket.room,
-			    date : data.date,
-			    readFlag : data.readFlag
-	 	  	 });
+				messageCode = result._id;
+
+				io.sockets.in(socket.room).emit('msg', {
+			    	messageCode : messageCode,
+				    scode : socket.mCode,
+				    nickname : socket.nickname,
+				    msg : data.msg,
+				    roomCode : socket.room,
+				    date : data.date,
+				    readFlag : data.readFlag
+	 	  	 	});
+
+		});
 	};
 
 	var nickname;
 	var rcode;
-	var scode;
+	
+	//평소에는 inChat변수가 false
 	socket.inChat = false;
 	console.log("user 입장");
 
-	//채팅방 들어간 것
+	//채팅방 들어감
 	socket.on('chat', function(data){
-		
 		console.log('chat');
 
-		scode = data.scode;
 		rcode = data.rcode;
+		socket.mCode = data.scode;
 		socket.nickname = data.nickname;
 		socket.room = data.room;
+		//채팅페이지에 들어갔을 경우 inChat 은 true
 		socket.inChat = true;
 
 		var participate = false;
-		//아직 대화를 나누지 않은 채팅방에 들어갔을 경우
-		if(socket.room==0)
+		
+		//대화를 나누지 않은 채팅방에 들어갔을 경우
+		if(socket.room==0){
 			socket.join(0);
+		}else{
 
-		if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고 누군가 있다
-			//해당 룸의 모든 socket 정보들을 가져오고
-			var sockets = io.sockets.adapter.rooms[socket.room]['sockets'];
-			//for 문으로 소켓 하나씩 검사
-			for (var socketId in sockets) {
-				var soc = io.sockets.connected[socketId];
-				//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
-				if(soc['mCode'] != socket.mCode){
-					//현재 타인이 채팅방에 있는지 여부를 저장
-					participate = soc['inChat'];
-					break;
+			if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+socket.mCode)){ //현재 나 말고 누군가 있다
+				//해당 룸의 모든 socket 정보들을 가져오고
+				var sockets = io.sockets.adapter.rooms[socket.room]['sockets'];
+				//for 문으로 소켓 하나씩 검사
+				for (var socketId in sockets) {
+					var soc = io.sockets.connected[socketId];
+					//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
+					if(soc['mCode'] != socket.mCode){
+						//현재 타인이 채팅방에 있는지 여부를 저장
+
+						participate = soc['inChat'];
+						break;
+
+					}
 				}
 			}
 		}
@@ -127,29 +132,36 @@ io.on('connection',function(socket){
 			if(socket.room==0){
 				//방이 없고 새로운 방을 생성해야 하는 경우라면, 방을 생성하고 유저 등록.
 				var sql = "insert into messageRoom(latestdate) values('" + data.date + "')";
-				
+				//트랜잭션 시작
 				mysql.beginTransaction(function(err){
 					if(err) {
 						throw err;
 					}
+
+					//룸 테이블에 삽입
 					mysql.query(sql, function(err,result){	
 						if(err) {
 							mysql.rollback(function(){
 								throw err;
 							})
 						}
+						
+						//생성된 룸 코드를 socket.room 에 대입
 						socket.room = result.insertId;
-					
+
+						//룸 유저를 추가해주기 위한 쿼리
 						sql = "insert into roomUser values";
-						sql += "(" + socket.room + "," + scode + "),";
+						sql += "(" + socket.room + "," + socket.mCode + "),";
 						sql += "(" + socket.room + "," + rcode + ")";
 
 						mysql.query(sql, function(err,result){
+							//에러가 있다면 rollback
 							if(err) {
 								mysql.rollback(function(){
 									throw err;
 								});
 							}
+
 								mysql.commit(function(err){
 									if(err) {
 										mysql.rollback(function(){
@@ -159,21 +171,22 @@ io.on('connection',function(socket){
 									console.log('success!');
 								});
 						});
-								
+						
 						socket.leave(0);
 						socket.join(socket.room);
+
+						//현재 해당 유저가 있다면, 새로 만들어진 룸에 조인시키기
 						var sockets = io.sockets.adapter.rooms['u'+rcode];
-						
-						//현재 해당 유저가 있다면 입장시키기
+						//해당 유저가 없지 않다면,
 						if(sockets!=undefined){
+							//소켓 정보들을 가져오고,
 							var socs = sockets['sockets'];
+
 							for (var socketId in socs) {
+							//해당 소켓아이디에 해당되는 정보를 가져옴
 							var soc = io.sockets.connected[socketId];
 								//해당 소켓의 mCode 가 나의 mCode 와 다를 경우
-								soc.join(socket.room)
-								io.to(soc.id).emit('newRoom',{
-									roomCode : socket.room
-								});
+								soc.join(socket.room);
 							}
 						}
 						emitmsg(data);
@@ -181,12 +194,14 @@ io.on('connection',function(socket){
 
 				}); //transaction end
 			}else{
+
 				emitmsg(data);
+
 			}
 	  });
 
 	  //header 와 chatList 에서 쓰임.
-	  //모든 룸의 현재 오고있는 메세지를 알려주기 위한 메소드
+	  //모든 룸의 현재 오고있는 메세지를 알려주기 위함
 	  socket.on('joinAllRooms',function(data){
 
 			console.log("joinAllRooms");
@@ -207,12 +222,12 @@ io.on('connection',function(socket){
 	  		console.log('disconnect');
 			socket.inChat = false;
 
-			if(socket.room!=undefined && scode!=undefined){
+			if(socket.room!=undefined && socket.mCode!=undefined){
 				var participate = false;
-				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+scode)){ //현재 나 말고도 누군가 있는 상태
-					if(getUsersInRoomNumber('u'+scode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태
+				if(getUsersInRoomNumber(socket.room) != getUsersInRoomNumber('u'+socket.mCode)){ //현재 나 말고도 누군가 있는 상태
+					if(getUsersInRoomNumber('u'+socket.mCode)>0){ //근데 나와 같은 아이디로 여러개의 연결이 있는 상태
 						//또다른 나의 아이디의 inChat 여부 검사
-						var sockets = io.sockets.adapter.rooms['u'+scode]['sockets'];
+						var sockets = io.sockets.adapter.rooms['u'+socket.mCode]['sockets'];
 						//for 문으로 소켓 하나씩 검사
 						for (var socketId in sockets) {
 							var soc = io.sockets.connected[socketId];
@@ -223,7 +238,7 @@ io.on('connection',function(socket){
 								break;
 							}
 						}
-					}else if(getUsersInRoomNumber('u'+scode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
+					}else if(getUsersInRoomNumber('u'+socket.mCode)==0){ //같은 아이디에서 한개의 연결만이 있는 상태이므로 내가 나가면 진짜 나가는 것
 						participate = false;
 					}
 				}	
